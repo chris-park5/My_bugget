@@ -2,6 +2,7 @@ import os
 import sys
 from tkinter import messagebox, ttk, StringVar, Frame, Label, Radiobutton
 import tkinter.font as tkfont
+import tkinter.font as tkfont
 from datetime import datetime
 import matplotlib.pyplot as plt
 from matplotlib import font_manager
@@ -46,11 +47,26 @@ class MonthInput(Frame):
 
     def get_month(self):
         return f"{self.year_var.get()}-{self.month_var.get()}"
+    
+
+def set_global_font():
+    style = ttk.Style()
+    default_font = tkfont.nametofont("TkDefaultFont")
+    default_font.configure(size=13)  # 기본 폰트 크기 변경
+    style.configure('.', font=default_font)
+    # Treeview 폰트 설정
+    tree_font = tkfont.Font(family='NanumGothic', size=9)
+    style.configure("Treeview", font=tree_font, rowheight=25)
+    style.configure("Treeview.Heading", font=('NanumGothic', 13, 'bold'))
+
+    # Combobox 폰트 설정
+    style.configure("TCombobox", font=('Arial', 10))
 
 class View:
     def __init__(self, root):
         self.root = root
         self.root.title("가계부")
+        set_global_font()  # 폰트 크기 변경
         #self.root.geometry("1000x800")
         # 전체화면 설정
         # 모니터 화면 크기 구해서 창 크기 설정
@@ -97,7 +113,7 @@ class View:
         Radiobutton(self.root, text="지출", variable=self.transaction_type, value="지출").grid(row=4, column=2, sticky='w')
 
         Label(self.root, text="카테고리").grid(row=5, column=0, sticky="w", padx=(10,5), pady=5)
-        self.category_combo = ttk.Combobox(self.root, textvariable=self.category_var, values=["일반", "식비", "교통", "의료", "기타"])
+        self.category_combo = ttk.Combobox(self.root, textvariable=self.category_var, values=["교통","저축","주거","용돈","식비","의료","문화","교육","통신","기타"])
         self.category_combo.grid(row=5, column=1, columnspan=2, sticky="ew", pady=5)
         self.category_combo.current(0)
 
@@ -321,8 +337,8 @@ class View:
         font_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "fonts", "NanumGothic.ttf"))
         font_prop = font_manager.FontProperties(fname=font_path)
 
-        # 꺾은선 그래프
-        months = sorted(monthly_data.keys())
+        # 꺾은선 그래프 (기존 코드와 동일)
+        months = sorted(monthly_data.keys())[-12:]
         income = [monthly_data[m]["수입"] for m in months]
         expense = [monthly_data[m]["지출"] for m in months]
 
@@ -342,30 +358,56 @@ class View:
 
         # 막대 그래프
         if category_data:
-            
             latest_month = sorted(category_data.keys())[-1]
             category_expense = category_data[latest_month]
             labels = list(category_expense.keys())
             values = list(category_expense.values())
 
+            num_bars = len(labels)
+            
+            # 막대 개수가 적을 때 기준이 되는 최대 막대 개수
+            # 이 값을 조절하여 고정 너비를 유지할 막대 개수 상한을 설정할 수 있습니다.
+            MAX_FIXED_WIDTH_BARS = 5 
+            # 막대 개수가 적을 때 사용할 고정 너비 (0.0~1.0 사이, 1.0은 막대가 꽉 참)
+            FIXED_BAR_WIDTH = 0.5 
+
+            if num_bars <= MAX_FIXED_WIDTH_BARS:
+                # 막대 개수가 적을 때는 고정 너비를 사용
+                bar_width = FIXED_BAR_WIDTH
+                x_min = -0.5 
+                x_max = num_bars - 0.5 
+            else:
+                # 막대 개수가 많아질 때는 공간에 맞춰 너비를 자동으로 줄임
+                #  전체 X축 공간 대비 막대가 차지하는 비율
+                bar_width = 0.8 / num_bars 
+                # X축 범위는 전체 막대가 보이도록 설정
+                x_min = -0.5
+                x_max = num_bars - 0.5
+            # --- 변경된 막대 너비 및 X축 범위 조절 로직 끝 ---
+
+
             if values:
                 fig2, ax2 = plt.subplots(figsize=(6, 4))
-                bar_width = min(0.6, 0.8 / len(labels)) if labels else 0.3 # 항목 수에 따라 막대 너비 조정
                 bars = ax2.bar(labels, values, width=bar_width, align='center', color='skyblue')
                 ax2.set_title(f"{latest_month} 카테고리별 지출", fontproperties=font_prop)
                 ax2.set_xlabel("카테고리", fontproperties=font_prop)
                 ax2.set_ylabel("금액", fontproperties=font_prop)
-                for label in ax2.get_xticklabels():
-                    label.set_fontproperties(font_prop)
+                
+                # X축 눈금 위치를 명시적으로 설정하고 레이블 지정 (폰트 설정 포함)
+                x_positions = range(num_bars)
+                ax2.set_xticks(x_positions) 
+                ax2.set_xticklabels(labels, fontproperties=font_prop) 
+                
+                # 계산된 x_min, x_max를 사용하여 X축 범위 설정
+                ax2.set_xlim(x_min, x_max) 
+                
                 fig2.tight_layout()
-
-                # x축 레이블 폰트 지정
-                for label in ax2.get_xticklabels():
-                    label.set_fontproperties(font_prop)
 
                 # 각 막대 위에 금액 표시
                 for bar, value in zip(bars, values):
-                    ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height(), f"{value}원", 
+                    # 금액 텍스트 위치를 막대 높이보다 약간 위로 조정하여 겹치지 않도록 함
+                    # '5'는 픽셀 단위가 아닌 데이터 단위의 여백이므로, 그래프 크기나 데이터 값에 따라 조절할 수 있습니다.
+                    ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 5, f"{value}원", 
                             ha='center', va='bottom', fontproperties=font_prop, fontsize=9)
 
                 canvas2 = FigureCanvasTkAgg(fig2, master=self.graph_frame)
@@ -373,6 +415,6 @@ class View:
                 canvas2.get_tk_widget().grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
 
         # 그래프 프레임 그리드 확장 설정
-        self.graph_frame.grid_rowconfigure(0, weight=3)  # 꺾은선 그래프에 좀 더 공간
-        self.graph_frame.grid_rowconfigure(1, weight=2)  # 원 그래프에 공간
+        self.graph_frame.grid_rowconfigure(0, weight=3)
+        self.graph_frame.grid_rowconfigure(1, weight=2)
         self.graph_frame.grid_columnconfigure(0, weight=1)
