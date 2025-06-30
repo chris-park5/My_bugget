@@ -72,10 +72,16 @@ class LedgerController:
 
     def delete_transaction(self, item_id):
         values = self.view.get_transaction_values(item_id)
-        amount = int(values[1])
-        type_ = values[2]
+        # values: (date, amount, type, category, memo, 잔액)
+        target_values = tuple(values[:-1])  # 잔액 제외
 
-        self.transactions = [t for t in self.transactions if (t.date, t.amount, t.type, t.category, t.memo) != tuple(values)]
+        for i, t in enumerate(self.transactions):
+            if (t.date, t.amount, t.type, t.category, t.memo) == target_values:
+                amount = t.amount
+                type_ = t.type
+                del self.transactions[i]
+                break
+
         self.balance -= amount if type_ == "수입" else -amount
 
         self.view.remove_transaction_from_list(item_id)
@@ -85,9 +91,9 @@ class LedgerController:
         monthly_spent = self.calculate_monthly_spent()
         self.view.load_goals(self.monthly_goals, monthly_spent)
         self.refresh_graph_data()
-        #
         self.view.load_transactions(self.transactions)
         self.view.update_balance(self.balance)
+
 
     def edit_transaction(self, item_id, date, amount, type_, category, memo):
         try:
@@ -98,11 +104,13 @@ class LedgerController:
             return
 
         old_values = self.view.get_transaction_values(item_id)
+        # 잔액 제외하고 비교
+        target_values = tuple(old_values[:-1])
         old_amount = int(old_values[1])
         old_type = old_values[2]
 
         for t in self.transactions:
-            if (t.date, t.amount, t.type, t.category, t.memo) == tuple(old_values):
+            if (t.date, t.amount, t.type, t.category, t.memo) == target_values:
                 t.date, t.amount, t.type, t.category, t.memo = date, amount, type_, category, memo
                 break
 
@@ -115,10 +123,9 @@ class LedgerController:
 
         monthly_spent = self.calculate_monthly_spent()
         self.view.load_goals(self.monthly_goals, monthly_spent)
-        self.refresh_graph_data()
-        #
         self.view.load_transactions(self.transactions)
         self.view.update_balance(self.balance)
+        self.refresh_graph_data()
 
     def set_goal(self, year_month, amount_str):
         try:

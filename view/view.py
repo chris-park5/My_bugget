@@ -243,7 +243,7 @@ class View:
 
     # 거래내역 관련
     def add_transaction_to_list(self, t , current_balance):
-        self.transaction_list.insert('', 'end', values=(t.date, t.amount, t.type, t.category, t.memo, f"{current_balance}원"))
+        self.transaction_list.insert('', 'end',iid= t.id ,values=(t.date, t.amount, t.type, t.category, t.memo, f"{current_balance}원"))
         self.sort_transaction_list()
 
     def remove_transaction_from_list(self, item_id):
